@@ -7,7 +7,7 @@ export const options = {
     duration: __ENV.DURATION || '30s',
     thresholds: {
         verification_success_rate: ['rate>0.95'],
-        verification_latency_ms: ['p(95)<5000'],
+        rpc_verification_latency_ms: ['p(95)<5000'],
     },
 };
 
@@ -18,7 +18,7 @@ const AUTH_CODE = __ENV.AUTH_CODE || 'TC-A1B2C3D4';
 const VERIFY_BY_AUTH_CODE_SELECTOR = 'e2616f91';
 const GET_PRODUCT_BY_AUTH_CODE_SELECTOR = 'd2bf304b';
 
-const verificationLatency = new Trend('verification_latency_ms', true);
+const rpcVerificationLatency = new Trend('rpc_verification_latency_ms', true);
 const successfulVerifications = new Counter('successful_verifications');
 const verificationSuccessRate = new Rate('verification_success_rate');
 
@@ -86,8 +86,8 @@ export default function () {
         productFetched = productRes.status === 200 && Boolean(productRes.json('result'));
     }
 
-    const latencyMs = Date.now() - start;
-    verificationLatency.add(latencyMs);
+    const rpcLatencyMs = Date.now() - start;
+    rpcVerificationLatency.add(rpcLatencyMs);
 
     const success = verified && productFetched;
     verificationSuccessRate.add(success);

@@ -1197,7 +1197,7 @@
         </div>
 
         <div class="card">
-            <div class="card-title">Latency testing</div>
+            <div class="card-title">Customer response time testing</div>
             <div class="response-time-panel">
                 <div class="response-time-controls">
                     <div class="form-group">
@@ -1214,17 +1214,17 @@
                 </div>
                 <div class="stat-grid" style="margin-bottom:0;">
                     <div class="stat-card">
-                        <div class="lbl">Latest latency</div>
+                        <div class="lbl">Latest response time</div>
                         <div class="val" id="response-latest">-</div>
                     </div>
                     <div class="stat-card">
-                        <div class="lbl">Average latency</div>
+                        <div class="lbl">Average response time</div>
                         <div class="val" id="response-average">-</div>
                     </div>
                 </div>
                 <p class="response-time-note">
-                    Latency is measured in milliseconds from the moment verification begins until the result is
-                    displayed on the Customer Portal.
+                    Response time is measured in milliseconds from the moment verification begins until the result is
+                    displayed on the Customer Portal. In the report, this is the application-level latency.
                 </p>
                 <div class="response-time-table-wrap">
                     <table class="product-table">
@@ -1254,7 +1254,7 @@
                             oninput="this.value=this.value.toUpperCase()" />
                     </div>
                     <div class="form-group">
-                        <label>Requests</label>
+                        <label>Customers</label>
                         <input type="number" id="throughput-count" min="1" max="100" value="10" />
                     </div>
                     <button class="btn btn-primary" id="throughput-run-btn" onclick="runThroughputTest()">Run
@@ -1271,8 +1271,8 @@
                     </div>
                 </div>
                 <p class="response-time-note">
-                    Throughput is calculated as successful customer verification requests divided by total test time.
-                    The value is shown as requests per second.
+                    Enter the number of customers trying to verify at the same time. Throughput is calculated as
+                    successful customer verification requests divided by the total time taken.
                 </p>
                 <div id="throughput-status"></div>
                 <div class="throughput-actions">
@@ -1287,7 +1287,7 @@
                                 <th>No.</th>
                                 <th>Network</th>
                                 <th>Auth code</th>
-                                <th>Success</th>
+                                <th>Customers</th>
                                 <th>Total time</th>
                                 <th>Throughput</th>
                             </tr>
@@ -1741,7 +1741,7 @@
             return payload;
         }
 
-        function getThroughputRequestCount() {
+        function getThroughputCustomerCount() {
             const input = document.getElementById('throughput-count');
             const value = Number.parseInt(input ? input.value : '10', 10);
             if (!Number.isFinite(value) || value < 1) return 1;
@@ -1772,26 +1772,38 @@
                 return;
             }
 
-            tbody.innerHTML = [...throughputLog].reverse().map(record => `
+            tbody.innerHTML = [...throughputLog].reverse().map(record => {
+                const totalCustomers = record.totalCustomers || record.totalRequests || 0;
+                return `
         <tr>
             <td>${record.number}</td>
             <td>${escapeHtml(record.network)}</td>
             <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.authCode)}</span></td>
-            <td>${record.successfulRequests}/${record.totalRequests}</td>
+            <td>${record.successfulRequests}/${totalCustomers}</td>
             <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.totalMs))}</span></td>
             <td><span style="font-family:monospace;font-size:12px;">${formatThroughput(Number(record.throughput))}</span></td>
-        </tr>`).join('');
+        </tr>`;
+            }).join('');
+        }
+
+        async function performCustomerVerificationRead(authCode) {
+            const exists = await contract.methods.verifyByAuthCode(authCode).call();
+            if (!exists) return false;
+
+            const raw = await contract.methods.getProductByAuthCode(authCode).call();
+            const product = mapProduct(raw);
+            return Boolean(product && product.isRegistered);
         }
 
         async function runThroughputTest() {
             const btn = document.getElementById('throughput-run-btn');
             const statusEl = document.getElementById('throughput-status');
             let payload;
-            let totalRequests;
+            let totalCustomers;
 
             try {
                 payload = getThroughputAuthCode();
-                totalRequests = getThroughputRequestCount();
+                totalCustomers = getThroughputCustomerCount();
             } catch (err) {
                 if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
                 return;
@@ -1805,48 +1817,31 @@
                 btn.textContent = 'Running...';
             }
             if (statusEl) {
-                statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Running ${totalRequests} read-only customer verification requests...</div>`;
+                statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Simulating ${totalCustomers} customers verifying at the same time...</div>`;
             }
 
             try {
                 await initBlockchain({ requireAccount: false, contractAddress: targetContractAddress });
 
-                let successfulRequests = 0;
-                let failedRequests = 0;
                 const startedAt = performance.now();
-
-                for (let i = 0; i < totalRequests; i++) {
-                    try {
-                        const exists = await contract.methods.verifyByAuthCode(payload.authCode).call();
-                        if (exists) {
-                            const raw = await contract.methods.getProductByAuthCode(payload.authCode).call();
-                            const product = mapProduct(raw);
-                            if (product && product.isRegistered) {
-                                successfulRequests++;
-                            } else {
-                                failedRequests++;
-                            }
-                        } else {
-                            failedRequests++;
-                        }
-                    } catch (_) {
-                        failedRequests++;
-                    }
-
-                    if (statusEl) {
-                        statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Completed ${i + 1}/${totalRequests} requests...</div>`;
-                    }
-                }
+                const results = await Promise.all(
+                    Array.from({ length: totalCustomers }, () =>
+                        performCustomerVerificationRead(payload.authCode).catch(() => false)
+                    )
+                );
 
                 const totalMs = performance.now() - startedAt;
                 const totalSeconds = totalMs / 1000;
+                const successfulRequests = results.filter(Boolean).length;
+                const failedRequests = totalCustomers - successfulRequests;
                 const throughput = totalSeconds > 0 ? successfulRequests / totalSeconds : 0;
 
                 const record = {
                     number: throughputLog.length + 1,
                     network,
                     authCode: payload.authCode,
-                    totalRequests,
+                    totalCustomers,
+                    totalRequests: totalCustomers,
                     successfulRequests,
                     failedRequests,
                     totalMs,
@@ -1864,7 +1859,8 @@
             <div class="status-box success">
                 <div>
                     <strong>Throughput test complete.</strong><br>
-                    Formula: ${successfulRequests} successful requests / ${totalSeconds.toFixed(3)} seconds =
+                    ${totalCustomers} customers verified at the same time.<br>
+                    Formula: ${successfulRequests} successful verification requests / ${totalSeconds.toFixed(3)} seconds =
                     <strong style="font-family:monospace;">${formatThroughput(throughput)}</strong><br>
                     Failed or not-authentic requests: ${failedRequests}
                 </div>
@@ -1897,7 +1893,7 @@
                 'No',
                 'Network',
                 'Auth Code',
-                'Total Requests',
+                'Simulated Customers',
                 'Successful Requests',
                 'Failed Requests',
                 'Total Time (ms)',
@@ -1909,7 +1905,7 @@
                 record.number,
                 record.network,
                 record.authCode,
-                record.totalRequests,
+                record.totalCustomers || record.totalRequests,
                 record.successfulRequests,
                 record.failedRequests,
                 Math.round(Number(record.totalMs || 0)),

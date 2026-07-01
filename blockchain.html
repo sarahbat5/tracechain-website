@@ -334,7 +334,7 @@
 
         .response-time-controls {
             display: grid;
-            grid-template-columns: 1fr auto auto;
+            grid-template-columns: 1fr auto auto auto;
             gap: 10px;
             align-items: end;
         }
@@ -1184,6 +1184,7 @@
                         </select>
                     </div>
                     <button class="btn btn-outline" onclick="downloadResponseTimeCsv()">Download CSV</button>
+                    <button class="btn btn-outline" onclick="copyResponseTimeCsv()">Copy CSV</button>
                     <button class="btn btn-outline" onclick="clearResponseTimeLog()">Clear log</button>
                 </div>
                 <div class="stat-grid" style="margin-bottom:0;">
@@ -1547,10 +1548,9 @@
             renderResponseTimeLog();
         }
 
-        function downloadResponseTimeCsv() {
+        function buildResponseTimeCsv() {
             if (!responseTimeLog.length) {
-                alert('No response time results to download yet.');
-                return;
+                return '';
             }
 
             const headers = ['No', 'Network', 'Source', 'Auth Code', 'Result', 'Response Time (ms)', 'Response Time (s)', 'Measured At'];
@@ -1564,17 +1564,72 @@
                 (Number(record.elapsedMs || 0) / 1000).toFixed(3),
                 record.measuredAt
             ]);
-            const csv = [headers, ...rows]
+            return [headers, ...rows]
                 .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
                 .join('\n');
+        }
 
+        async function downloadResponseTimeCsv() {
+            const csv = buildResponseTimeCsv();
+            if (!csv) {
+                alert('No response time results to download yet.');
+                return;
+            }
+
+            const fileName = 'customer-verification-response-time.csv';
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+            if (navigator.canShare && navigator.share) {
+                const file = new File([blob], fileName, { type: 'text/csv' });
+                if (navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            title: 'Customer verification response time',
+                            text: 'TraceChain customer verification response time CSV',
+                            files: [file]
+                        });
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                }
+            }
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'customer-verification-response-time.csv';
+            a.download = fileName;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function copyResponseTimeCsv() {
+            const csv = buildResponseTimeCsv();
+            if (!csv) {
+                alert('No response time results to copy yet.');
+                return;
+            }
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(csv);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = csv;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.top = '-1000px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    textarea.remove();
+                }
+                alert('CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+            } catch (err) {
+                alert('Copy failed on this browser. Try using Download CSV or take a screenshot of the table.');
+            }
         }
 
         function normalizeRpcUrl(value) {

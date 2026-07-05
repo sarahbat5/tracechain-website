@@ -1523,10 +1523,17 @@
         const requestedPortal = PAGES.includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
 
         function updatePortalNav(activePage) {
+            const visiblePages = {
+                manufacturer: ['manufacturer', 'testing'],
+                customer: ['customer', 'testing'],
+                testing: PAGES
+            }[activePage] || PAGES;
+
             document.querySelectorAll('.nav-tab').forEach((tab, index) => {
-                const isActivePage = PAGES[index] === activePage;
+                const pageName = PAGES[index];
+                const isActivePage = pageName === activePage;
                 tab.classList.toggle('active', isActivePage);
-                tab.classList.remove('portal-hidden');
+                tab.classList.toggle('portal-hidden', !visiblePages.includes(pageName));
             });
         }
 

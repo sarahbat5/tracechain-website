@@ -1217,12 +1217,12 @@
     <div class="page" id="page-testing">
         <div class="page-header">
             <span class="role-badge badge-test">Network Testing Portal</span>
-            <h1>Blockchain network testing</h1>
-            <p>Internal tools for measuring Sepolia blockchain performance. Customer verification stays simple, while
-                testing records can be downloaded for your FYP results.</p>
+            <h1 id="testing-title">Blockchain network testing</h1>
+            <p id="testing-description">Internal tools for measuring Sepolia blockchain performance. Customer
+                verification stays simple, while testing records can be downloaded for your FYP results.</p>
         </div>
 
-        <div class="card">
+        <div class="card testing-manufacturer">
             <div class="card-title">Manufacturer blockchain storage confirmation time testing</div>
             <div class="response-time-panel">
                 <p class="response-time-note">
@@ -1266,7 +1266,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card testing-customer">
             <div class="card-title">Customer response time testing</div>
             <div class="response-time-panel">
                 <div class="response-time-controls">
@@ -1313,7 +1313,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card testing-customer">
             <div class="card-title">Throughput testing</div>
             <div class="response-time-panel">
                 <div class="throughput-controls">
@@ -1521,12 +1521,37 @@
         const PAGES = ['manufacturer', 'customer', 'testing'];
         const urlParams = new URLSearchParams(location.search);
         const requestedPortal = PAGES.includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
+        let testingContext = requestedPortal === 'customer' ? 'customer' : 'manufacturer';
+
+        function getActivePageName() {
+            const activePage = document.querySelector('.page.active');
+            return activePage ? activePage.id.replace('page-', '') : '';
+        }
+
+        function updateTestingPortal() {
+            const isManufacturerTesting = testingContext === 'manufacturer';
+            document.querySelectorAll('.testing-manufacturer').forEach(section => {
+                section.style.display = isManufacturerTesting ? '' : 'none';
+            });
+            document.querySelectorAll('.testing-customer').forEach(section => {
+                section.style.display = isManufacturerTesting ? 'none' : '';
+            });
+
+            const title = document.getElementById('testing-title');
+            const description = document.getElementById('testing-description');
+            if (title) title.textContent = isManufacturerTesting ? 'Manufacturer network testing' : 'Customer network testing';
+            if (description) {
+                description.textContent = isManufacturerTesting
+                    ? 'Measure blockchain storage confirmation time for product registration on Sepolia.'
+                    : 'Measure customer verification response time and throughput on Sepolia.';
+            }
+        }
 
         function updatePortalNav(activePage) {
             const visiblePages = {
                 manufacturer: ['manufacturer', 'testing'],
                 customer: ['customer', 'testing'],
-                testing: PAGES
+                testing: [testingContext, 'testing']
             }[activePage] || PAGES;
 
             document.querySelectorAll('.nav-tab').forEach((tab, index) => {
@@ -1543,8 +1568,16 @@
 
         function showPage(name) {
             if (!PAGES.includes(name)) name = 'manufacturer';
+            const previousPage = getActivePageName();
+            if (name === 'testing' && ['manufacturer', 'customer'].includes(previousPage)) {
+                testingContext = previousPage;
+            }
+            if (['manufacturer', 'customer'].includes(name)) {
+                testingContext = name;
+            }
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('page-' + name).classList.add('active');
+            updateTestingPortal();
             updatePortalNav(name);
             if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
             if (name !== 'customer') stopScanner();

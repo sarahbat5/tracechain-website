@@ -1520,36 +1520,31 @@
         ──────────────────────────────────────── */
         const PAGES = ['manufacturer', 'customer', 'testing'];
         const urlParams = new URLSearchParams(location.search);
-        const lockedPortal = ['manufacturer', 'customer'].includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
+        const requestedPortal = PAGES.includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
 
         function updatePortalNav(activePage) {
             document.querySelectorAll('.nav-tab').forEach((tab, index) => {
                 const isActivePage = PAGES[index] === activePage;
                 tab.classList.toggle('active', isActivePage);
-                tab.classList.toggle('portal-hidden', !isActivePage && Boolean(lockedPortal));
+                tab.classList.remove('portal-hidden');
             });
         }
 
         function applyPortalMode() {
-            updatePortalNav(lockedPortal || location.hash.replace('#', '') || 'manufacturer');
+            updatePortalNav(location.hash.replace('#', '') || requestedPortal || 'manufacturer');
         }
 
         function showPage(name) {
-            if (lockedPortal) name = lockedPortal;
             if (!PAGES.includes(name)) name = 'manufacturer';
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('page-' + name).classList.add('active');
             updatePortalNav(name);
-            if (!lockedPortal && location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+            if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
             if (name !== 'customer') stopScanner();
         }
 
         function showPageFromHash() {
-            if (lockedPortal) {
-                showPage(lockedPortal);
-                return;
-            }
-            showPage(location.hash.replace('#', ''));
+            showPage(location.hash.replace('#', '') || requestedPortal || 'manufacturer');
         }
 
         /* ────────────────────────────────────────

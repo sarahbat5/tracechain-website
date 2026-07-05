@@ -152,6 +152,11 @@
             color: #3C3489;
         }
 
+        .badge-test {
+            background: #FAEEDA;
+            color: #633806;
+        }
+
         /* CARDS */
         .card {
             background: var(--bg-primary);
@@ -945,6 +950,15 @@
             </svg>
             <span>Customer</span>
         </div>
+        <div class="nav-tab" onclick="showPage('testing')">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                <rect x="3" y="8" width="2" height="5" rx="0.5" stroke="currentColor" stroke-width="1.3" />
+                <rect x="7" y="4" width="2" height="9" rx="0.5" stroke="currentColor" stroke-width="1.3" />
+                <rect x="11" y="6" width="2" height="7" rx="0.5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+            <span>Network Testing</span>
+        </div>
     </nav>
 
     <!-- QR MODAL -->
@@ -1196,6 +1210,62 @@
             </div>
         </div>
 
+        <div id="cust-result"></div>
+    </div>
+
+    <!-- NETWORK TESTING PAGE -->
+    <div class="page" id="page-testing">
+        <div class="page-header">
+            <span class="role-badge badge-test">Network Testing Portal</span>
+            <h1>Blockchain network testing</h1>
+            <p>Internal tools for measuring Sepolia blockchain performance. Customer verification stays simple, while
+                testing records can be downloaded for your FYP results.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Manufacturer blockchain storage confirmation time testing</div>
+            <div class="response-time-panel">
+                <p class="response-time-note">
+                    Measures how long it takes to store product information on the blockchain. Timing starts after
+                    MetaMask approval when the transaction hash is received, and stops when the transaction receipt is
+                    returned.
+                </p>
+                <div class="stat-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="lbl">Latest confirmation time</div>
+                        <div class="val" id="confirmation-latest">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="lbl">Average confirmation time</div>
+                        <div class="val" id="confirmation-average">-</div>
+                    </div>
+                </div>
+                <div id="confirmationTime"></div>
+                <div class="throughput-actions">
+                    <button class="btn btn-outline" onclick="downloadConfirmationTimeCsv()">Download CSV</button>
+                    <button class="btn btn-outline" onclick="copyConfirmationTimeCsv()">Copy CSV</button>
+                    <button class="btn btn-outline" onclick="clearConfirmationTimeLog()">Clear log</button>
+                </div>
+                <div class="response-time-table-wrap">
+                    <table class="product-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Product ID</th>
+                                <th>Auth code</th>
+                                <th>Block #</th>
+                                <th>Confirmation time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="confirmation-time-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="response-time-note">
+                    This result is recorded automatically when you register a product from the Manufacturer portal.
+                </p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-title">Customer response time testing</div>
             <div class="response-time-panel">
@@ -1223,8 +1293,8 @@
                     </div>
                 </div>
                 <p class="response-time-note">
-                    Response time is measured in milliseconds from the moment verification begins until the result is
-                    displayed on the Customer Portal. This represents the end-user waiting time.
+                    Response time is measured from the moment verification begins until the result is displayed on the
+                    Customer portal. Run a scan or manual verification, then view the recorded result here.
                 </p>
                 <div class="response-time-table-wrap">
                     <table class="product-table">
@@ -1297,8 +1367,6 @@
                 </div>
             </div>
         </div>
-
-        <div id="cust-result"></div>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -1385,6 +1453,8 @@
         let responseTimeLog = loadResponseTimeLog();
         const THROUGHPUT_LOG_KEY = 'tracechainCustomerThroughputLog';
         let throughputLog = loadThroughputLog();
+        const CONFIRMATION_TIME_LOG_KEY = 'tracechainConfirmationTimeLog';
+        let confirmationTimeLog = loadConfirmationTimeLog();
 
         /* ────────────────────────────────────────
            BLOCKCHAIN INIT
@@ -1448,15 +1518,15 @@
         /* ────────────────────────────────────────
            PAGE SWITCHING
         ──────────────────────────────────────── */
-        const PAGES = ['manufacturer', 'customer'];
+        const PAGES = ['manufacturer', 'customer', 'testing'];
         const urlParams = new URLSearchParams(location.search);
-        const lockedPortal = PAGES.includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
+        const lockedPortal = ['manufacturer', 'customer'].includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
 
         function updatePortalNav(activePage) {
             document.querySelectorAll('.nav-tab').forEach((tab, index) => {
                 const isActivePage = PAGES[index] === activePage;
                 tab.classList.toggle('active', isActivePage);
-                tab.classList.toggle('portal-hidden', !isActivePage);
+                tab.classList.toggle('portal-hidden', !isActivePage && Boolean(lockedPortal));
             });
         }
 
@@ -1982,6 +2052,137 @@
             }
         }
 
+        function loadConfirmationTimeLog() {
+            try {
+                const records = JSON.parse(localStorage.getItem(CONFIRMATION_TIME_LOG_KEY) || '[]');
+                return Array.isArray(records) ? records : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveConfirmationTimeLog() {
+            localStorage.setItem(CONFIRMATION_TIME_LOG_KEY, JSON.stringify(confirmationTimeLog));
+        }
+
+        function renderConfirmationTimeLog() {
+            const latestEl = document.getElementById('confirmation-latest');
+            const averageEl = document.getElementById('confirmation-average');
+            const tbody = document.getElementById('confirmation-time-tbody');
+            if (!latestEl || !averageEl || !tbody) return;
+
+            const latest = confirmationTimeLog[confirmationTimeLog.length - 1];
+            const average = confirmationTimeLog.length
+                ? confirmationTimeLog.reduce((sum, item) => sum + Number(item.storageTimeMs || 0), 0) / confirmationTimeLog.length
+                : NaN;
+
+            latestEl.textContent = latest ? formatResponseTime(latest.storageTimeMs) : '-';
+            averageEl.textContent = Number.isFinite(average) ? formatResponseTime(average) : '-';
+
+            if (!confirmationTimeLog.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No blockchain storage confirmations recorded yet. Register a product from the Manufacturer tab.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = [...confirmationTimeLog].reverse().map(record => `
+        <tr>
+            <td>${record.number}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.authCode)}</span></td>
+            <td>${record.blockNumber != null ? escapeHtml(String(record.blockNumber)) : '-'}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.storageTimeMs))}</span></td>
+        </tr>`).join('');
+        }
+
+        function clearConfirmationTimeLog() {
+            if (!confirmationTimeLog.length) return;
+            if (!confirm('Clear all recorded blockchain storage confirmation time results?')) return;
+            confirmationTimeLog = [];
+            saveConfirmationTimeLog();
+            renderConfirmationTimeLog();
+        }
+
+        function buildConfirmationTimeCsv() {
+            if (!confirmationTimeLog.length) return '';
+
+            const headers = ['No', 'Product ID', 'Auth Code', 'Block Number', 'Storage Time (ms)', 'Storage Time (s)', 'Measured At'];
+            const rows = confirmationTimeLog.map(record => [
+                record.number,
+                record.pid,
+                record.authCode,
+                record.blockNumber != null ? record.blockNumber : '',
+                Math.round(Number(record.storageTimeMs || 0)),
+                (Number(record.storageTimeMs || 0) / 1000).toFixed(3),
+                record.measuredAt
+            ]);
+            return [headers, ...rows]
+                .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+        }
+
+        async function downloadConfirmationTimeCsv() {
+            const csv = buildConfirmationTimeCsv();
+            if (!csv) {
+                alert('No blockchain storage confirmation results to download yet.');
+                return;
+            }
+
+            const fileName = 'manufacturer-blockchain-storage-confirmation-time.csv';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+            if (navigator.canShare && navigator.share) {
+                const file = new File([blob], fileName, { type: 'text/csv' });
+                if (navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            title: 'Manufacturer blockchain storage confirmation time',
+                            text: 'TraceChain manufacturer blockchain storage confirmation time CSV',
+                            files: [file]
+                        });
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                }
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function copyConfirmationTimeCsv() {
+            const csv = buildConfirmationTimeCsv();
+            if (!csv) {
+                alert('No blockchain storage confirmation results to copy yet.');
+                return;
+            }
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(csv);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = csv;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.top = '-1000px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    textarea.remove();
+                }
+                alert('Confirmation time CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+            } catch (err) {
+                alert('Copy failed on this browser. Try using Download CSV or take a screenshot of the table.');
+            }
+        }
+
         function normalizeRpcUrl(value) {
             const url = (value || '').trim();
             if (!url) throw new Error('Enter your Sepolia RPC / Alchemy URL.');
@@ -2314,15 +2515,53 @@
 
             const authCode = genAuthCode();
 
-            /* Send to smart contract */
+            let storageStartTime = null;
+            let storageTimeMs = null;
+            let confirmedBlockNumber = null;
+
+            /* Send to smart contract. Timing excludes MetaMask review/approval time. */
             try {
-                await contract.methods.registerProduct(
-                    pid, name, category, bid, authCode,
-                    company, origin, prodDate, expDate
-                ).send({ from: account, gas: 500000 });
+                await new Promise((resolve, reject) => {
+                    const tx = contract.methods.registerProduct(
+                        pid, name, category, bid, authCode,
+                        company, origin, prodDate, expDate
+                    ).send({ from: account, gas: 500000 });
+
+                    tx.on('transactionHash', hash => {
+                        storageStartTime = performance.now();
+                        showMsg('mfr-msg', 'info', `&#8987;&nbsp;Transaction submitted (<span style="font-family:monospace;">${hash.slice(0, 10)}...</span>). Waiting for Sepolia confirmation...`);
+                    });
+
+                    tx.on('receipt', receipt => {
+                        const storageEndTime = performance.now();
+                        if (storageStartTime != null) storageTimeMs = storageEndTime - storageStartTime;
+                        confirmedBlockNumber = receipt && receipt.blockNumber != null ? Number(receipt.blockNumber) : null;
+                        resolve(receipt);
+                    });
+
+                    tx.on('error', reject);
+                });
             } catch (err) {
                 showMsg('mfr-msg', 'error', '&#10005;&nbsp;Smart contract transaction failed: ' + (err.message || err));
                 return;
+            }
+
+            if (Number.isFinite(storageTimeMs)) {
+                confirmationTimeLog.push({
+                    number: confirmationTimeLog.length + 1,
+                    pid,
+                    authCode,
+                    blockNumber: confirmedBlockNumber,
+                    storageTimeMs,
+                    measuredAt: new Date().toLocaleString()
+                });
+                saveConfirmationTimeLog();
+                renderConfirmationTimeLog();
+
+                const confirmationEl = document.getElementById('confirmationTime');
+                if (confirmationEl) {
+                    confirmationEl.innerText = 'Blockchain Storage Confirmation Time: ' + (storageTimeMs / 1000).toFixed(2) + ' seconds';
+                }
             }
 
             /* Success */
@@ -2336,9 +2575,12 @@
 
             renderMfrTable();
             showInlineQR(product);
+            const confirmationNote = Number.isFinite(storageTimeMs)
+                ? ` Blockchain storage confirmation time: <strong>${(storageTimeMs / 1000).toFixed(2)}s</strong> (see Network Testing tab for details).`
+                : '';
             showMsg('mfr-msg', 'success',
                 `&#10003;&nbsp;Product <strong>${name}</strong> saved on blockchain.
-         Auth code: <strong style="font-family:monospace;">${authCode}</strong>`);
+         Auth code: <strong style="font-family:monospace;">${authCode}</strong>.${confirmationNote}`);
 
             /* Clear form */
             ['mfr-name', 'mfr-pid', 'mfr-bid', 'mfr-prod-date', 'mfr-exp-date',
@@ -2715,6 +2957,7 @@
         initContractSettings();
         renderResponseTimeLog();
         renderThroughputLog();
+        renderConfirmationTimeLog();
         showPageFromHash();
         autoVerifyFromUrl();
     </script>

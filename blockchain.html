@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/web3@4.16.0/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="tracechain-contract.js"></script>
     <style>
         *,
@@ -170,6 +171,18 @@
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 1rem;
+        }
+
+        .section-title-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .section-title-actions .card-title {
+            margin-bottom: 0;
         }
 
         /* FORMS */
@@ -449,6 +462,15 @@
             }
 
             .throughput-controls .btn {
+                justify-content: center;
+            }
+
+            .section-title-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .section-title-actions .btn {
                 justify-content: center;
             }
         }
@@ -1125,7 +1147,10 @@
         <!-- Registered products list -->
         <div id="mfr-list-wrap" style="display:none;">
             <hr class="divider">
-            <div class="card-title">Registered products (this session)</div>
+            <div class="section-title-actions">
+                <div class="card-title">Registered products (this session)</div>
+                <button class="btn btn-download" onclick="downloadRegisteredProductsPdf()">Download PDF</button>
+            </div>
             <div class="card" style="padding:0; overflow:hidden;">
                 <table class="product-table">
                     <thead>
@@ -3421,6 +3446,149 @@
         /* ════════════════════════════════════════
            CUSTOMER — QR SCANNER
         ════════════════════════════════════════ */
+        function downloadRegisteredProductsPdf() {
+            if (!sessionProds.length) {
+                alert('No registered products to download yet.');
+                return;
+            }
+
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert('PDF library is still loading. Please try again in a few seconds.');
+                return;
+            }
+
+            const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 12;
+            const columns = [
+                { title: 'No.', width: 8 },
+                { title: 'Product ID', width: 26 },
+                { title: 'Name', width: 32 },
+                { title: 'Batch ID', width: 22 },
+                { title: 'Prod. Date', width: 22 },
+                { title: 'Auth Code', width: 28 },
+                { title: 'QR', width: 20, isQr: true },
+                { title: 'Manufacturer', width: 36 },
+                { title: 'Origin', width: 57 },
+                { title: 'Blockchain', width: 22 }
+            ];
+            const rows = [...sessionProds].reverse().map((p, index) => ({
+                product: p,
+                values: [
+                    String(index + 1),
+                    p.pid || '-',
+                    p.name || '-',
+                    p.bid || '-',
+                    p.prodDate || '-',
+                    p.authCode || '-',
+                    '',
+                    p.company || '-',
+                    p.origin || '-',
+                    'On-chain'
+                ]
+            }));
+
+            function createProductQrDataUrl(product) {
+                const temp = document.createElement('div');
+                temp.style.position = 'fixed';
+                temp.style.left = '-9999px';
+                temp.style.top = '-9999px';
+                temp.style.width = '90px';
+                temp.style.height = '90px';
+                document.body.appendChild(temp);
+
+                new QRCode(temp, {
+                    text: buildQRText(product),
+                    width: 90,
+                    height: 90,
+                    colorDark: '#1a1a18',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                const canvas = temp.querySelector('canvas');
+                const img = temp.querySelector('img');
+                const dataUrl = canvas ? canvas.toDataURL('image/png') : (img ? img.src : '');
+                temp.remove();
+                return dataUrl;
+            }
+
+            function drawHeader() {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.text('TraceChain Registered Products', margin, 15);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 21);
+                doc.text(`Total products: ${sessionProds.length}`, pageWidth - margin, 21, { align: 'right' });
+            }
+
+            function drawTableHeader(y) {
+                let x = margin;
+                doc.setFillColor(245, 245, 243);
+                doc.rect(margin, y, pageWidth - margin * 2, 8, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8);
+                columns.forEach(col => {
+                    doc.text(col.title, x + 1.5, y + 5.3, { maxWidth: col.width - 3 });
+                    x += col.width;
+                });
+                doc.setDrawColor(210, 210, 205);
+                doc.line(margin, y + 8, pageWidth - margin, y + 8);
+            }
+
+            function addPageNumber() {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(95, 94, 90);
+                doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+                doc.setTextColor(26, 26, 24);
+            }
+
+            drawHeader();
+            let y = 28;
+            drawTableHeader(y);
+            y += 10;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+
+            rows.forEach(row => {
+                const qrDataUrl = createProductQrDataUrl(row.product);
+                const wrappedCells = row.values.map((value, index) =>
+                    columns[index].isQr ? [''] : doc.splitTextToSize(String(value), columns[index].width - 3)
+                );
+                const rowHeight = Math.max(24, ...wrappedCells.map(lines => lines.length * 4 + 3));
+
+                if (y + rowHeight > pageHeight - 14) {
+                    addPageNumber();
+                    doc.addPage();
+                    drawHeader();
+                    y = 28;
+                    drawTableHeader(y);
+                    y += 10;
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8);
+                }
+
+                let x = margin;
+                wrappedCells.forEach((lines, index) => {
+                    if (columns[index].isQr && qrDataUrl) {
+                        doc.addImage(qrDataUrl, 'PNG', x + 2, y + 2, 16, 16);
+                    } else {
+                        doc.text(lines, x + 1.5, y + 4, { maxWidth: columns[index].width - 3 });
+                    }
+                    x += columns[index].width;
+                });
+                doc.setDrawColor(235, 235, 232);
+                doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
+                y += rowHeight;
+            });
+
+            addPageNumber();
+            doc.save(`tracechain-registered-products-${new Date().toISOString().slice(0, 10)}.pdf`);
+        }
+
         function switchTab(tab) {
             document.querySelectorAll('.scan-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));

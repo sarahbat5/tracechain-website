@@ -3404,12 +3404,8 @@
 
             renderMfrTable();
             showInlineQR(product);
-            const confirmationNote = Number.isFinite(storageTimeMs)
-                ? ` Blockchain storage confirmation time: <strong>${(storageTimeMs / 1000).toFixed(2)}s</strong> (see Network Testing tab for details).`
-                : '';
             showMsg('mfr-msg', 'success',
-                `&#10003;&nbsp;Product <strong>${name}</strong> saved on blockchain.
-         Auth code: <strong style="font-family:monospace;">${authCode}</strong>.${confirmationNote}`);
+                `&#10003;&nbsp;Product <strong>${escapeHtml(name)}</strong> registered successfully.`);
 
             /* Clear form */
             ['mfr-name', 'mfr-pid', 'mfr-bid', 'mfr-prod-date', 'mfr-exp-date',

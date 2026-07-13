@@ -1272,6 +1272,16 @@
                     </div>
                 </div>
                 <div id="confirmationTime"></div>
+                <div class="response-time-controls">
+                    <div class="form-group">
+                        <label>Network connection used for this test</label>
+                        <select id="confirmation-network">
+                            <option>WiFi</option>
+                            <option>Mobile hotspot</option>
+                            <option>Other network</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="throughput-actions">
                     <button class="btn btn-outline" onclick="downloadConfirmationTimeCsv()">Download CSV</button>
                     <button class="btn btn-outline" onclick="copyConfirmationTimeCsv()">Copy CSV</button>
@@ -1282,6 +1292,7 @@
                         <thead>
                             <tr>
                                 <th>No.</th>
+                                <th>Network</th>
                                 <th>Product ID</th>
                                 <th>Auth code</th>
                                 <th>Block #</th>
@@ -2906,13 +2917,14 @@
             averageEl.textContent = Number.isFinite(average) ? formatResponseTime(average) : '-';
 
             if (!confirmationTimeLog.length) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No blockchain storage confirmations recorded yet. Register a product from the Manufacturer tab.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No blockchain storage confirmations recorded yet. Register a product from the Manufacturer tab.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = [...confirmationTimeLog].reverse().map(record => `
         <tr>
             <td>${record.number}</td>
+            <td>${escapeHtml(record.network || 'Not specified')}</td>
             <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
             <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.authCode)}</span></td>
             <td>${record.blockNumber != null ? escapeHtml(String(record.blockNumber)) : '-'}</td>
@@ -2931,9 +2943,10 @@
         function buildConfirmationTimeCsv() {
             if (!confirmationTimeLog.length) return '';
 
-            const headers = ['No', 'Product ID', 'Auth Code', 'Block Number', 'Storage Time (ms)', 'Storage Time (s)', 'Measured At'];
+            const headers = ['No', 'Network', 'Product ID', 'Auth Code', 'Block Number', 'Storage Time (ms)', 'Storage Time (s)', 'Measured At'];
             const rows = confirmationTimeLog.map(record => [
                 record.number,
+                record.network || 'Not specified',
                 record.pid,
                 record.authCode,
                 record.blockNumber != null ? record.blockNumber : '',
@@ -3375,6 +3388,7 @@
             if (Number.isFinite(storageTimeMs)) {
                 confirmationTimeLog.push({
                     number: confirmationTimeLog.length + 1,
+                    network: getSelectedLabel('confirmation-network'),
                     pid,
                     authCode,
                     blockNumber: confirmedBlockNumber,

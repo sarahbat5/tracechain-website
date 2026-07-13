@@ -367,7 +367,7 @@
 
         .throughput-controls {
             display: grid;
-            grid-template-columns: 1fr 120px auto;
+            grid-template-columns: 1fr minmax(120px, 160px) minmax(100px, 120px) auto;
             gap: 10px;
             align-items: end;
         }
@@ -1266,6 +1266,125 @@
             </div>
         </div>
 
+        <div class="card testing-manufacturer">
+            <div class="card-title">Manufacturer latency testing</div>
+            <div class="response-time-panel">
+                <div class="throughput-controls">
+                    <div class="form-group">
+                        <label>Product ID to test</label>
+                        <input type="text" id="manufacturer-latency-pid" placeholder="PRD-2024-001"
+                            style="font-family:var(--font-mono); font-size:15px;" />
+                    </div>
+                    <div class="form-group">
+                        <label>Network</label>
+                        <select id="manufacturer-latency-network">
+                            <option>WiFi</option>
+                            <option>Mobile hotspot</option>
+                            <option>Other network</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="manufacturer-latency-run-btn"
+                        onclick="runManufacturerLatencyTest()">Run test</button>
+                </div>
+                <div class="stat-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="lbl">Latest latency</div>
+                        <div class="val" id="manufacturer-latency-latest">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="lbl">Average latency</div>
+                        <div class="val" id="manufacturer-latency-average">-</div>
+                    </div>
+                </div>
+                <p class="response-time-note">
+                    Latency measures the round-trip time for the manufacturer to query one registered Product ID from
+                    the blockchain smart contract.
+                </p>
+                <div id="manufacturer-latency-status"></div>
+                <div class="throughput-actions">
+                    <button class="btn btn-outline" onclick="downloadManufacturerLatencyCsv()">Download CSV</button>
+                    <button class="btn btn-outline" onclick="copyManufacturerLatencyCsv()">Copy CSV</button>
+                    <button class="btn btn-outline" onclick="clearManufacturerLatencyLog()">Clear log</button>
+                </div>
+                <div class="response-time-table-wrap">
+                    <table class="product-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Network</th>
+                                <th>Product ID</th>
+                                <th>Result</th>
+                                <th>Latency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manufacturer-latency-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card testing-manufacturer">
+            <div class="card-title">Manufacturer throughput testing</div>
+            <div class="response-time-panel">
+                <div class="throughput-controls">
+                    <div class="form-group">
+                        <label>Product ID to test</label>
+                        <input type="text" id="manufacturer-throughput-pid" placeholder="PRD-2024-001"
+                            style="font-family:var(--font-mono); font-size:15px;" />
+                    </div>
+                    <div class="form-group">
+                        <label>Network</label>
+                        <select id="manufacturer-throughput-network">
+                            <option>WiFi</option>
+                            <option>Mobile hotspot</option>
+                            <option>Other network</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Requests</label>
+                        <input type="number" id="manufacturer-throughput-count" min="1" max="100" value="10" />
+                    </div>
+                    <button class="btn btn-primary" id="manufacturer-throughput-run-btn"
+                        onclick="runManufacturerThroughputTest()">Run test</button>
+                </div>
+                <div class="stat-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="lbl">Latest throughput</div>
+                        <div class="val" id="manufacturer-throughput-latest">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="lbl">Average throughput</div>
+                        <div class="val" id="manufacturer-throughput-average">-</div>
+                    </div>
+                </div>
+                <p class="response-time-note">
+                    Throughput is calculated as successful manufacturer Product ID lookup requests divided by the total
+                    time taken.
+                </p>
+                <div id="manufacturer-throughput-status"></div>
+                <div class="throughput-actions">
+                    <button class="btn btn-outline" onclick="downloadManufacturerThroughputCsv()">Download CSV</button>
+                    <button class="btn btn-outline" onclick="copyManufacturerThroughputCsv()">Copy CSV</button>
+                    <button class="btn btn-outline" onclick="clearManufacturerThroughputLog()">Clear log</button>
+                </div>
+                <div class="response-time-table-wrap">
+                    <table class="product-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Network</th>
+                                <th>Product ID</th>
+                                <th>Requests</th>
+                                <th>Total time</th>
+                                <th>Throughput</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manufacturer-throughput-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="card testing-customer">
             <div class="card-title">Customer response time testing</div>
             <div class="response-time-panel">
@@ -1314,7 +1433,65 @@
         </div>
 
         <div class="card testing-customer">
-            <div class="card-title">Throughput testing</div>
+            <div class="card-title">Customer latency testing</div>
+            <div class="response-time-panel">
+                <div class="throughput-controls">
+                    <div class="form-group">
+                        <label>Authentication code to test</label>
+                        <input type="text" id="customer-latency-code" placeholder="TC-A1B2C3D4"
+                            style="letter-spacing:1.5px; font-family:var(--font-mono); font-size:15px;"
+                            oninput="this.value=this.value.toUpperCase()" />
+                    </div>
+                    <div class="form-group">
+                        <label>Network</label>
+                        <select id="customer-latency-network">
+                            <option>WiFi</option>
+                            <option>Mobile hotspot</option>
+                            <option>Other network</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="customer-latency-run-btn" onclick="runCustomerLatencyTest()">Run
+                        test</button>
+                </div>
+                <div class="stat-grid" style="margin-bottom:0;">
+                    <div class="stat-card">
+                        <div class="lbl">Latest latency</div>
+                        <div class="val" id="customer-latency-latest">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="lbl">Average latency</div>
+                        <div class="val" id="customer-latency-average">-</div>
+                    </div>
+                </div>
+                <p class="response-time-note">
+                    Latency measures only the blockchain smart contract verification round trip. It does not include QR
+                    scanning time or result display rendering.
+                </p>
+                <div id="customer-latency-status"></div>
+                <div class="throughput-actions">
+                    <button class="btn btn-outline" onclick="downloadCustomerLatencyCsv()">Download CSV</button>
+                    <button class="btn btn-outline" onclick="copyCustomerLatencyCsv()">Copy CSV</button>
+                    <button class="btn btn-outline" onclick="clearCustomerLatencyLog()">Clear log</button>
+                </div>
+                <div class="response-time-table-wrap">
+                    <table class="product-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Network</th>
+                                <th>Auth code</th>
+                                <th>Result</th>
+                                <th>Latency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customer-latency-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card testing-customer">
+            <div class="card-title">Customer throughput testing</div>
             <div class="response-time-panel">
                 <div class="throughput-controls">
                     <div class="form-group">
@@ -1417,6 +1594,33 @@
                 "type": "function"
             },
             {
+                "inputs": [{ "internalType": "string", "name": "_productID", "type": "string" }],
+                "name": "verifyByProductID",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{ "internalType": "string", "name": "_productID", "type": "string" }],
+                "name": "getProduct",
+                "outputs": [
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "string", "name": "", "type": "string" },
+                    { "internalType": "uint256", "name": "", "type": "uint256" },
+                    { "internalType": "bool", "name": "", "type": "bool" },
+                    { "internalType": "bool", "name": "", "type": "bool" }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
                 "inputs": [{ "internalType": "string", "name": "_authCode", "type": "string" }],
                 "name": "getProductByAuthCode",
                 "outputs": [
@@ -1455,6 +1659,12 @@
         let throughputLog = loadThroughputLog();
         const CONFIRMATION_TIME_LOG_KEY = 'tracechainConfirmationTimeLog';
         let confirmationTimeLog = loadConfirmationTimeLog();
+        const MANUFACTURER_LATENCY_LOG_KEY = 'tracechainManufacturerLatencyLog';
+        let manufacturerLatencyLog = loadStoredLog(MANUFACTURER_LATENCY_LOG_KEY);
+        const MANUFACTURER_THROUGHPUT_LOG_KEY = 'tracechainManufacturerThroughputLog';
+        let manufacturerThroughputLog = loadStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY);
+        const CUSTOMER_LATENCY_LOG_KEY = 'tracechainCustomerLatencyLog';
+        let customerLatencyLog = loadStoredLog(CUSTOMER_LATENCY_LOG_KEY);
 
         /* ────────────────────────────────────────
            BLOCKCHAIN INIT
@@ -1542,8 +1752,8 @@
             if (title) title.textContent = isManufacturerTesting ? 'Manufacturer network testing' : 'Customer network testing';
             if (description) {
                 description.textContent = isManufacturerTesting
-                    ? 'Measure blockchain storage confirmation time for product registration on Sepolia.'
-                    : 'Measure customer verification response time and throughput on Sepolia.';
+                    ? 'Measure manufacturer blockchain storage confirmation time, latency, and throughput on Sepolia.'
+                    : 'Measure customer verification response time, latency, and throughput on Sepolia.';
             }
         }
 
@@ -1615,6 +1825,87 @@
 
         function formatAddress(address) {
             return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+        }
+
+        function loadStoredLog(key) {
+            try {
+                const records = JSON.parse(localStorage.getItem(key) || '[]');
+                return Array.isArray(records) ? records : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveStoredLog(key, records) {
+            localStorage.setItem(key, JSON.stringify(records));
+        }
+
+        function getSelectedLabel(id, fallback = 'Not specified') {
+            const select = document.getElementById(id);
+            return select ? select.value : fallback;
+        }
+
+        function getBoundedInteger(id, fallback, min, max) {
+            const input = document.getElementById(id);
+            const value = Number.parseInt(input ? input.value : String(fallback), 10);
+            if (!Number.isFinite(value) || value < min) return min;
+            return Math.min(value, max);
+        }
+
+        function csvFromRows(headers, rows) {
+            return [headers, ...rows]
+                .map(row => row.map(value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+        }
+
+        async function downloadCsvFile(csv, fileName, shareTitle, shareText) {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+            if (navigator.canShare && navigator.share) {
+                const file = new File([blob], fileName, { type: 'text/csv' });
+                if (navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            title: shareTitle,
+                            text: shareText,
+                            files: [file]
+                        });
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                }
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        async function copyCsvToClipboard(csv, copiedMessage) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(csv);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = csv;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.top = '-1000px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    textarea.remove();
+                }
+                alert(copiedMessage);
+            } catch (err) {
+                alert('Copy failed on this browser. Try using Download CSV or take a screenshot of the table.');
+            }
         }
 
         function loadResponseTimeLog() {
@@ -1819,6 +2110,473 @@
             }
         }
 
+        function getManufacturerProductId(inputId) {
+            const input = document.getElementById(inputId);
+            const raw = (input && input.value.trim()) || (lastRegistered && lastRegistered.pid) || '';
+            if (!raw) throw new Error('Enter a registered Product ID for manufacturer testing.');
+            if (input) input.value = raw;
+            return raw;
+        }
+
+        function renderManufacturerLatencyLog() {
+            const latestEl = document.getElementById('manufacturer-latency-latest');
+            const averageEl = document.getElementById('manufacturer-latency-average');
+            const tbody = document.getElementById('manufacturer-latency-tbody');
+            if (!latestEl || !averageEl || !tbody) return;
+
+            const latest = manufacturerLatencyLog[manufacturerLatencyLog.length - 1];
+            const average = manufacturerLatencyLog.length
+                ? manufacturerLatencyLog.reduce((sum, item) => sum + Number(item.latencyMs || 0), 0) / manufacturerLatencyLog.length
+                : NaN;
+
+            latestEl.textContent = latest ? formatResponseTime(latest.latencyMs) : '-';
+            averageEl.textContent = Number.isFinite(average) ? formatResponseTime(average) : '-';
+
+            if (!manufacturerLatencyLog.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No manufacturer latency tests recorded yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = [...manufacturerLatencyLog].reverse().map(record => `
+        <tr>
+            <td>${record.number}</td>
+            <td>${escapeHtml(record.network)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
+            <td>${escapeHtml(record.outcome)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.latencyMs))}</span></td>
+        </tr>`).join('');
+        }
+
+        async function performManufacturerProductRead(pid) {
+            const exists = await contract.methods.verifyByProductID(pid).call();
+            if (!exists) return false;
+
+            const raw = await contract.methods.getProduct(pid).call();
+            const product = mapProduct(raw);
+            return Boolean(product && product.isRegistered);
+        }
+
+        async function runManufacturerLatencyTest() {
+            const btn = document.getElementById('manufacturer-latency-run-btn');
+            const statusEl = document.getElementById('manufacturer-latency-status');
+            let pid;
+
+            try {
+                pid = getManufacturerProductId('manufacturer-latency-pid');
+            } catch (err) {
+                if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Running...';
+            }
+            if (statusEl) {
+                statusEl.innerHTML = '<div class="status-box info">&#8987;&nbsp;Measuring manufacturer product lookup latency...</div>';
+            }
+
+            try {
+                await initBlockchain({ requireAccount: false });
+                const startedAt = performance.now();
+                const found = await performManufacturerProductRead(pid);
+                const latencyMs = performance.now() - startedAt;
+                const outcome = found ? 'Registered product found' : 'Product not found';
+
+                const record = {
+                    number: manufacturerLatencyLog.length + 1,
+                    network: getSelectedLabel('manufacturer-latency-network'),
+                    pid,
+                    outcome,
+                    latencyMs,
+                    measuredAt: new Date().toLocaleString()
+                };
+
+                manufacturerLatencyLog.push(record);
+                saveStoredLog(MANUFACTURER_LATENCY_LOG_KEY, manufacturerLatencyLog);
+                renderManufacturerLatencyLog();
+
+                if (statusEl) {
+                    statusEl.innerHTML = `
+            <div class="status-box ${found ? 'success' : 'warning'}">
+                <div>
+                    <strong>Latency test complete.</strong><br>
+                    Product ID <span style="font-family:monospace;">${escapeHtml(pid)}</span>: ${escapeHtml(outcome)}.<br>
+                    Latency: <strong style="font-family:monospace;">${formatResponseTimeWithSeconds(latencyMs)}</strong>
+                </div>
+            </div>`;
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer latency test failed: ${escapeHtml(err.message || err)}</div>`;
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Run test';
+                }
+            }
+        }
+
+        function clearManufacturerLatencyLog() {
+            if (!manufacturerLatencyLog.length) return;
+            if (!confirm('Clear all recorded manufacturer latency results?')) return;
+            manufacturerLatencyLog = [];
+            saveStoredLog(MANUFACTURER_LATENCY_LOG_KEY, manufacturerLatencyLog);
+            renderManufacturerLatencyLog();
+        }
+
+        function buildManufacturerLatencyCsv() {
+            if (!manufacturerLatencyLog.length) return '';
+
+            return csvFromRows(
+                ['No', 'Network', 'Product ID', 'Result', 'Latency (ms)', 'Latency (s)', 'Measured At'],
+                manufacturerLatencyLog.map(record => [
+                    record.number,
+                    record.network,
+                    record.pid,
+                    record.outcome,
+                    Math.round(Number(record.latencyMs || 0)),
+                    (Number(record.latencyMs || 0) / 1000).toFixed(3),
+                    record.measuredAt
+                ])
+            );
+        }
+
+        async function downloadManufacturerLatencyCsv() {
+            const csv = buildManufacturerLatencyCsv();
+            if (!csv) {
+                alert('No manufacturer latency results to download yet.');
+                return;
+            }
+            await downloadCsvFile(csv, 'manufacturer-latency.csv', 'Manufacturer latency', 'TraceChain manufacturer latency CSV');
+        }
+
+        async function copyManufacturerLatencyCsv() {
+            const csv = buildManufacturerLatencyCsv();
+            if (!csv) {
+                alert('No manufacturer latency results to copy yet.');
+                return;
+            }
+            await copyCsvToClipboard(csv, 'Manufacturer latency CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+        }
+
+        function renderManufacturerThroughputLog() {
+            const latestEl = document.getElementById('manufacturer-throughput-latest');
+            const averageEl = document.getElementById('manufacturer-throughput-average');
+            const tbody = document.getElementById('manufacturer-throughput-tbody');
+            if (!latestEl || !averageEl || !tbody) return;
+
+            const latest = manufacturerThroughputLog[manufacturerThroughputLog.length - 1];
+            const average = manufacturerThroughputLog.length
+                ? manufacturerThroughputLog.reduce((sum, item) => sum + Number(item.throughput || 0), 0) / manufacturerThroughputLog.length
+                : NaN;
+
+            latestEl.textContent = latest ? formatThroughput(Number(latest.throughput)) : '-';
+            averageEl.textContent = Number.isFinite(average) ? formatThroughput(average) : '-';
+
+            if (!manufacturerThroughputLog.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No manufacturer throughput tests recorded yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = [...manufacturerThroughputLog].reverse().map(record => `
+        <tr>
+            <td>${record.number}</td>
+            <td>${escapeHtml(record.network)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
+            <td>${record.successfulRequests}/${record.totalRequests}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.totalMs))}</span></td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatThroughput(Number(record.throughput))}</span></td>
+        </tr>`).join('');
+        }
+
+        async function runManufacturerThroughputTest() {
+            const btn = document.getElementById('manufacturer-throughput-run-btn');
+            const statusEl = document.getElementById('manufacturer-throughput-status');
+            let pid;
+            let totalRequests;
+
+            try {
+                pid = getManufacturerProductId('manufacturer-throughput-pid');
+                totalRequests = getBoundedInteger('manufacturer-throughput-count', 10, 1, 100);
+            } catch (err) {
+                if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Running...';
+            }
+            if (statusEl) {
+                statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Running ${totalRequests} manufacturer Product ID lookup requests...</div>`;
+            }
+
+            try {
+                await initBlockchain({ requireAccount: false });
+                const startedAt = performance.now();
+                const results = await Promise.all(
+                    Array.from({ length: totalRequests }, () =>
+                        performManufacturerProductRead(pid).catch(() => false)
+                    )
+                );
+
+                const totalMs = performance.now() - startedAt;
+                const totalSeconds = totalMs / 1000;
+                const successfulRequests = results.filter(Boolean).length;
+                const failedRequests = totalRequests - successfulRequests;
+                const throughput = totalSeconds > 0 ? successfulRequests / totalSeconds : 0;
+
+                const record = {
+                    number: manufacturerThroughputLog.length + 1,
+                    network: getSelectedLabel('manufacturer-throughput-network'),
+                    pid,
+                    totalRequests,
+                    successfulRequests,
+                    failedRequests,
+                    totalMs,
+                    totalSeconds,
+                    throughput,
+                    measuredAt: new Date().toLocaleString()
+                };
+
+                manufacturerThroughputLog.push(record);
+                saveStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY, manufacturerThroughputLog);
+                renderManufacturerThroughputLog();
+
+                if (statusEl) {
+                    statusEl.innerHTML = `
+            <div class="status-box success">
+                <div>
+                    <strong>Manufacturer throughput test complete.</strong><br>
+                    Formula: ${successfulRequests} successful product lookup requests / ${totalSeconds.toFixed(3)} seconds =
+                    <strong style="font-family:monospace;">${formatThroughput(throughput)}</strong><br>
+                    Failed or not-found requests: ${failedRequests}
+                </div>
+            </div>`;
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer throughput test failed: ${escapeHtml(err.message || err)}</div>`;
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Run test';
+                }
+            }
+        }
+
+        function clearManufacturerThroughputLog() {
+            if (!manufacturerThroughputLog.length) return;
+            if (!confirm('Clear all recorded manufacturer throughput results?')) return;
+            manufacturerThroughputLog = [];
+            saveStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY, manufacturerThroughputLog);
+            renderManufacturerThroughputLog();
+        }
+
+        function buildManufacturerThroughputCsv() {
+            if (!manufacturerThroughputLog.length) return '';
+
+            return csvFromRows(
+                [
+                    'No',
+                    'Network',
+                    'Product ID',
+                    'Total Requests',
+                    'Successful Requests',
+                    'Failed Requests',
+                    'Total Time (ms)',
+                    'Total Time (s)',
+                    'Throughput (requests/second)',
+                    'Measured At'
+                ],
+                manufacturerThroughputLog.map(record => [
+                    record.number,
+                    record.network,
+                    record.pid,
+                    record.totalRequests,
+                    record.successfulRequests,
+                    record.failedRequests,
+                    Math.round(Number(record.totalMs || 0)),
+                    Number(record.totalSeconds || 0).toFixed(3),
+                    Number(record.throughput || 0).toFixed(3),
+                    record.measuredAt
+                ])
+            );
+        }
+
+        async function downloadManufacturerThroughputCsv() {
+            const csv = buildManufacturerThroughputCsv();
+            if (!csv) {
+                alert('No manufacturer throughput results to download yet.');
+                return;
+            }
+            await downloadCsvFile(csv, 'manufacturer-throughput.csv', 'Manufacturer throughput', 'TraceChain manufacturer throughput CSV');
+        }
+
+        async function copyManufacturerThroughputCsv() {
+            const csv = buildManufacturerThroughputCsv();
+            if (!csv) {
+                alert('No manufacturer throughput results to copy yet.');
+                return;
+            }
+            await copyCsvToClipboard(csv, 'Manufacturer throughput CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+        }
+
+        function getCustomerLatencyPayload() {
+            const latencyInput = document.getElementById('customer-latency-code');
+            const throughputInput = document.getElementById('throughput-code');
+            const manualInput = document.getElementById('cust-code');
+            const raw = (latencyInput && latencyInput.value.trim())
+                || (throughputInput && throughputInput.value.trim())
+                || (manualInput && manualInput.value.trim())
+                || '';
+            const payload = parseTraceChainPayload(raw);
+            if (!payload || !payload.authCode) {
+                throw new Error('Enter a valid TraceChain authentication code for customer latency testing.');
+            }
+            if (latencyInput) latencyInput.value = payload.authCode;
+            return payload;
+        }
+
+        function renderCustomerLatencyLog() {
+            const latestEl = document.getElementById('customer-latency-latest');
+            const averageEl = document.getElementById('customer-latency-average');
+            const tbody = document.getElementById('customer-latency-tbody');
+            if (!latestEl || !averageEl || !tbody) return;
+
+            const latest = customerLatencyLog[customerLatencyLog.length - 1];
+            const average = customerLatencyLog.length
+                ? customerLatencyLog.reduce((sum, item) => sum + Number(item.latencyMs || 0), 0) / customerLatencyLog.length
+                : NaN;
+
+            latestEl.textContent = latest ? formatResponseTime(latest.latencyMs) : '-';
+            averageEl.textContent = Number.isFinite(average) ? formatResponseTime(average) : '-';
+
+            if (!customerLatencyLog.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No customer latency tests recorded yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = [...customerLatencyLog].reverse().map(record => `
+        <tr>
+            <td>${record.number}</td>
+            <td>${escapeHtml(record.network)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.authCode)}</span></td>
+            <td>${escapeHtml(record.outcome)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.latencyMs))}</span></td>
+        </tr>`).join('');
+        }
+
+        async function runCustomerLatencyTest() {
+            const btn = document.getElementById('customer-latency-run-btn');
+            const statusEl = document.getElementById('customer-latency-status');
+            let payload;
+
+            try {
+                payload = getCustomerLatencyPayload();
+            } catch (err) {
+                if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
+                return;
+            }
+
+            const targetContractAddress = (payload.contractAddress || CONTRACT_ADDRESS || '').trim();
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Running...';
+            }
+            if (statusEl) {
+                statusEl.innerHTML = '<div class="status-box info">&#8987;&nbsp;Measuring customer blockchain verification latency...</div>';
+            }
+
+            try {
+                await initBlockchain({ requireAccount: false, contractAddress: targetContractAddress });
+                const startedAt = performance.now();
+                const authentic = await performCustomerVerificationRead(payload.authCode);
+                const latencyMs = performance.now() - startedAt;
+                const outcome = authentic ? 'Authentic' : 'Not authentic';
+
+                const record = {
+                    number: customerLatencyLog.length + 1,
+                    network: getSelectedLabel('customer-latency-network'),
+                    authCode: payload.authCode,
+                    outcome,
+                    latencyMs,
+                    measuredAt: new Date().toLocaleString()
+                };
+
+                customerLatencyLog.push(record);
+                saveStoredLog(CUSTOMER_LATENCY_LOG_KEY, customerLatencyLog);
+                renderCustomerLatencyLog();
+
+                if (statusEl) {
+                    statusEl.innerHTML = `
+            <div class="status-box ${authentic ? 'success' : 'warning'}">
+                <div>
+                    <strong>Customer latency test complete.</strong><br>
+                    Auth code <span style="font-family:monospace;">${escapeHtml(payload.authCode)}</span>: ${escapeHtml(outcome)}.<br>
+                    Latency: <strong style="font-family:monospace;">${formatResponseTimeWithSeconds(latencyMs)}</strong>
+                </div>
+            </div>`;
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Customer latency test failed: ${escapeHtml(err.message || err)}</div>`;
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Run test';
+                }
+            }
+        }
+
+        function clearCustomerLatencyLog() {
+            if (!customerLatencyLog.length) return;
+            if (!confirm('Clear all recorded customer latency results?')) return;
+            customerLatencyLog = [];
+            saveStoredLog(CUSTOMER_LATENCY_LOG_KEY, customerLatencyLog);
+            renderCustomerLatencyLog();
+        }
+
+        function buildCustomerLatencyCsv() {
+            if (!customerLatencyLog.length) return '';
+
+            return csvFromRows(
+                ['No', 'Network', 'Auth Code', 'Result', 'Latency (ms)', 'Latency (s)', 'Measured At'],
+                customerLatencyLog.map(record => [
+                    record.number,
+                    record.network,
+                    record.authCode,
+                    record.outcome,
+                    Math.round(Number(record.latencyMs || 0)),
+                    (Number(record.latencyMs || 0) / 1000).toFixed(3),
+                    record.measuredAt
+                ])
+            );
+        }
+
+        async function downloadCustomerLatencyCsv() {
+            const csv = buildCustomerLatencyCsv();
+            if (!csv) {
+                alert('No customer latency results to download yet.');
+                return;
+            }
+            await downloadCsvFile(csv, 'customer-verification-latency.csv', 'Customer verification latency', 'TraceChain customer verification latency CSV');
+        }
+
+        async function copyCustomerLatencyCsv() {
+            const csv = buildCustomerLatencyCsv();
+            if (!csv) {
+                alert('No customer latency results to copy yet.');
+                return;
+            }
+            await copyCsvToClipboard(csv, 'Customer latency CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+        }
+
         function loadThroughputLog() {
             try {
                 const records = JSON.parse(localStorage.getItem(THROUGHPUT_LOG_KEY) || '[]');
@@ -1843,6 +2601,8 @@
                 throw new Error('Enter a valid TraceChain authentication code for throughput testing.');
             }
             if (throughputInput) throughputInput.value = payload.authCode;
+            const customerLatencyInput = document.getElementById('customer-latency-code');
+            if (customerLatencyInput && !customerLatencyInput.value.trim()) customerLatencyInput.value = payload.authCode;
             return payload;
         }
 
@@ -2605,6 +3365,15 @@
             lastRegistered = product;
             chainCount++;
 
+            const manufacturerLatencyInput = document.getElementById('manufacturer-latency-pid');
+            if (manufacturerLatencyInput && !manufacturerLatencyInput.value.trim()) manufacturerLatencyInput.value = pid;
+            const manufacturerThroughputInput = document.getElementById('manufacturer-throughput-pid');
+            if (manufacturerThroughputInput && !manufacturerThroughputInput.value.trim()) manufacturerThroughputInput.value = pid;
+            const customerLatencyInput = document.getElementById('customer-latency-code');
+            if (customerLatencyInput && !customerLatencyInput.value.trim()) customerLatencyInput.value = authCode;
+            const throughputInput = document.getElementById('throughput-code');
+            if (throughputInput && !throughputInput.value.trim()) throughputInput.value = authCode;
+
             document.getElementById('stat-total').textContent = sessionProds.length;
             document.getElementById('stat-chain').textContent = chainCount;
 
@@ -2782,6 +3551,8 @@
             }
             const throughputInput = document.getElementById('throughput-code');
             if (throughputInput && !throughputInput.value.trim()) throughputInput.value = payload.authCode;
+            const customerLatencyInput = document.getElementById('customer-latency-code');
+            if (customerLatencyInput && !customerLatencyInput.value.trim()) customerLatencyInput.value = payload.authCode;
             verifyCode(payload.authCode, payload.contractAddress, timer);
         }
 
@@ -2794,6 +3565,8 @@
             if (input) input.value = payload.authCode;
             const throughputInput = document.getElementById('throughput-code');
             if (throughputInput) throughputInput.value = payload.authCode;
+            const customerLatencyInput = document.getElementById('customer-latency-code');
+            if (customerLatencyInput) customerLatencyInput.value = payload.authCode;
             verifyCode(payload.authCode, payload.contractAddress, startCustomerResponseTimer('QR link'));
         }
 
@@ -2991,6 +3764,9 @@
         }
         initContractSettings();
         renderResponseTimeLog();
+        renderManufacturerLatencyLog();
+        renderManufacturerThroughputLog();
+        renderCustomerLatencyLog();
         renderThroughputLog();
         renderConfirmationTimeLog();
         showPageFromHash();

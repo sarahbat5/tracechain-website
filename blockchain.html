@@ -1309,12 +1309,12 @@
         </div>
 
         <div class="card testing-manufacturer">
-            <div class="card-title">Manufacturer latency testing</div>
+            <div class="card-title">Manufacturer transaction submission latency testing</div>
             <div class="response-time-panel">
                 <div class="throughput-controls">
                     <div class="form-group">
-                        <label>Product ID to test</label>
-                        <input type="text" id="manufacturer-latency-pid" placeholder="PRD-2024-001"
+                        <label>Base Product ID</label>
+                        <input type="text" id="manufacturer-latency-pid" placeholder="PRD-LATENCY"
                             style="font-family:var(--font-mono); font-size:15px;" />
                     </div>
                     <div class="form-group">
@@ -1339,8 +1339,8 @@
                     </div>
                 </div>
                 <p class="response-time-note">
-                    Latency measures the round-trip time for the manufacturer to query one registered Product ID from
-                    the blockchain smart contract.
+                    Latency measures the delay from sending the signed registerProduct transaction to Sepolia until a
+                    transaction hash is returned. MetaMask approval time is excluded.
                 </p>
                 <div id="manufacturer-latency-status"></div>
                 <div class="throughput-actions">
@@ -1355,7 +1355,7 @@
                                 <th>No.</th>
                                 <th>Network</th>
                                 <th>Product ID</th>
-                                <th>Result</th>
+                                <th>Transaction hash</th>
                                 <th>Latency</th>
                             </tr>
                         </thead>
@@ -1701,7 +1701,7 @@
         let throughputLog = loadThroughputLog();
         const CONFIRMATION_TIME_LOG_KEY = 'tracechainConfirmationTimeLog';
         let confirmationTimeLog = loadConfirmationTimeLog();
-        const MANUFACTURER_LATENCY_LOG_KEY = 'tracechainManufacturerLatencyLog';
+        const MANUFACTURER_LATENCY_LOG_KEY = 'tracechainManufacturerSubmissionLatencyLog';
         let manufacturerLatencyLog = loadStoredLog(MANUFACTURER_LATENCY_LOG_KEY);
         const MANUFACTURER_THROUGHPUT_LOG_KEY = 'tracechainManufacturerRegistrationThroughputLog';
         let manufacturerThroughputLog = loadStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY);
@@ -1794,7 +1794,7 @@
             if (title) title.textContent = isManufacturerTesting ? 'Manufacturer network testing' : 'Customer network testing';
             if (description) {
                 description.textContent = isManufacturerTesting
-                    ? 'Measure manufacturer blockchain storage confirmation time, latency, and throughput on Sepolia.'
+                    ? 'Measure manufacturer storage confirmation time, transaction submission latency, and registration throughput on Sepolia.'
                     : 'Measure customer verification response time, latency, and throughput on Sepolia.';
             }
         }
@@ -2152,12 +2152,30 @@
             }
         }
 
-        function getManufacturerProductId(inputId) {
-            const input = document.getElementById(inputId);
-            const raw = (input && input.value.trim()) || (lastRegistered && lastRegistered.pid) || '';
-            if (!raw) throw new Error('Enter a registered Product ID for manufacturer testing.');
+        function getManufacturerLatencyBaseProductId() {
+            const input = document.getElementById('manufacturer-latency-pid');
+            const raw = ((input && input.value.trim()) || 'PRD-LATENCY').replace(/\s+/g, '-').toUpperCase();
             if (input) input.value = raw;
             return raw;
+        }
+
+        function buildManufacturerRegistrationTestPayload(basePid) {
+            const runId = Date.now().toString(36).toUpperCase();
+            const pid = `${basePid}-${runId}`;
+            const authCode = `TC-L${runId}`;
+            const today = new Date().toISOString().slice(0, 10);
+
+            return {
+                pid,
+                name: 'Latency Test Product',
+                category: 'Testing',
+                batchId: `BATCH-${runId}`,
+                authCode,
+                company: 'Latency Test Manufacturer',
+                origin: 'Sepolia Test',
+                productionDate: today,
+                expiryDate: ''
+            };
         }
 
         function renderManufacturerLatencyLog() {
@@ -2175,7 +2193,7 @@
             averageEl.textContent = Number.isFinite(average) ? formatResponseTime(average) : '-';
 
             if (!manufacturerLatencyLog.length) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No manufacturer latency tests recorded yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No manufacturer transaction submission latency tests recorded yet.</td></tr>';
                 return;
             }
 
@@ -2184,53 +2202,88 @@
             <td>${record.number}</td>
             <td>${escapeHtml(record.network)}</td>
             <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
-            <td>${escapeHtml(record.outcome)}</td>
+            <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.txHash ? record.txHash.slice(0, 10) + '...' + record.txHash.slice(-6) : '-')}</span></td>
             <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.latencyMs))}</span></td>
         </tr>`).join('');
         }
 
-        async function performManufacturerProductRead(pid) {
-            const exists = await contract.methods.verifyByProductID(pid).call();
-            if (!exists) return false;
+        async function sendRegistrationAndMeasureSubmissionLatency(payload, statusEl) {
+            return new Promise((resolve, reject) => {
+                let sentAt = null;
+                let settled = false;
 
-            const raw = await contract.methods.getProduct(pid).call();
-            const product = mapProduct(raw);
-            return Boolean(product && product.isRegistered);
+                const markSent = () => {
+                    if (sentAt == null) sentAt = performance.now();
+                };
+
+                const tx = contract.methods.registerProduct(
+                    payload.pid,
+                    payload.name,
+                    payload.category,
+                    payload.batchId,
+                    payload.authCode,
+                    payload.company,
+                    payload.origin,
+                    payload.productionDate,
+                    payload.expiryDate
+                ).send({ from: account, gas: 500000 });
+
+                tx.on('sending', markSent);
+                tx.on('sent', markSent);
+
+                tx.on('transactionHash', hash => {
+                    markSent();
+                    if (settled) return;
+                    settled = true;
+                    const hashAt = performance.now();
+                    resolve({
+                        txHash: hash,
+                        latencyMs: hashAt - sentAt,
+                        sentAt,
+                        hashAt
+                    });
+                });
+
+                tx.on('receipt', receipt => {
+                    if (statusEl && receipt && receipt.blockNumber != null) {
+                        statusEl.insertAdjacentHTML('beforeend', `<div class="status-box success" style="margin-top:8px;">Transaction later confirmed in block ${escapeHtml(String(receipt.blockNumber))}.</div>`);
+                    }
+                });
+
+                tx.on('error', err => {
+                    if (settled) return;
+                    settled = true;
+                    reject(err);
+                });
+            });
         }
 
         async function runManufacturerLatencyTest() {
             const btn = document.getElementById('manufacturer-latency-run-btn');
             const statusEl = document.getElementById('manufacturer-latency-status');
-            let pid;
-
-            try {
-                pid = getManufacturerProductId('manufacturer-latency-pid');
-            } catch (err) {
-                if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
-                return;
-            }
+            const basePid = getManufacturerLatencyBaseProductId();
+            const payload = buildManufacturerRegistrationTestPayload(basePid);
 
             if (btn) {
                 btn.disabled = true;
                 btn.textContent = 'Running...';
             }
             if (statusEl) {
-                statusEl.innerHTML = '<div class="status-box info">&#8987;&nbsp;Measuring manufacturer product lookup latency...</div>';
+                statusEl.innerHTML = '<div class="status-box info">&#8987;&nbsp;Connect MetaMask and approve the registration transaction. Timing starts after approval when the signed transaction is sent.</div>';
             }
 
             try {
-                await initBlockchain({ requireAccount: false });
-                const startedAt = performance.now();
-                const found = await performManufacturerProductRead(pid);
-                const latencyMs = performance.now() - startedAt;
-                const outcome = found ? 'Registered product found' : 'Product not found';
+                await initBlockchain({ requireAccount: true });
+
+                const result = await sendRegistrationAndMeasureSubmissionLatency(payload, statusEl);
 
                 const record = {
                     number: manufacturerLatencyLog.length + 1,
                     network: getSelectedLabel('manufacturer-latency-network'),
-                    pid,
-                    outcome,
-                    latencyMs,
+                    pid: payload.pid,
+                    authCode: payload.authCode,
+                    txHash: result.txHash,
+                    latencyMs: result.latencyMs,
                     measuredAt: new Date().toLocaleString()
                 };
 
@@ -2240,17 +2293,19 @@
 
                 if (statusEl) {
                     statusEl.innerHTML = `
-            <div class="status-box ${found ? 'success' : 'warning'}">
+            <div class="status-box success">
                 <div>
-                    <strong>Latency test complete.</strong><br>
-                    Product ID <span style="font-family:monospace;">${escapeHtml(pid)}</span>: ${escapeHtml(outcome)}.<br>
-                    Latency: <strong style="font-family:monospace;">${formatResponseTimeWithSeconds(latencyMs)}</strong>
+                    <strong>Submission latency test complete.</strong><br>
+                    Product ID <span style="font-family:monospace;">${escapeHtml(payload.pid)}</span><br>
+                    Transaction hash <span style="font-family:monospace; overflow-wrap:anywhere;">${escapeHtml(result.txHash)}</span><br>
+                    Formula: transaction hash time - transaction sent time =
+                    <strong style="font-family:monospace;">${formatResponseTimeWithSeconds(result.latencyMs)}</strong>
                 </div>
             </div>`;
                 }
             } catch (err) {
                 if (statusEl) {
-                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer latency test failed: ${escapeHtml(err.message || err)}</div>`;
+                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer submission latency test failed: ${escapeHtml(err.message || err)}</div>`;
                 }
             } finally {
                 if (btn) {
@@ -2262,7 +2317,7 @@
 
         function clearManufacturerLatencyLog() {
             if (!manufacturerLatencyLog.length) return;
-            if (!confirm('Clear all recorded manufacturer latency results?')) return;
+            if (!confirm('Clear all recorded manufacturer transaction submission latency results?')) return;
             manufacturerLatencyLog = [];
             saveStoredLog(MANUFACTURER_LATENCY_LOG_KEY, manufacturerLatencyLog);
             renderManufacturerLatencyLog();
@@ -2272,12 +2327,13 @@
             if (!manufacturerLatencyLog.length) return '';
 
             return csvFromRows(
-                ['No', 'Network', 'Product ID', 'Result', 'Latency (ms)', 'Latency (s)', 'Measured At'],
+                ['No', 'Network', 'Product ID', 'Auth Code', 'Transaction Hash', 'Submission Latency (ms)', 'Submission Latency (s)', 'Measured At'],
                 manufacturerLatencyLog.map(record => [
                     record.number,
                     record.network,
                     record.pid,
-                    record.outcome,
+                    record.authCode,
+                    record.txHash || '',
                     Math.round(Number(record.latencyMs || 0)),
                     (Number(record.latencyMs || 0) / 1000).toFixed(3),
                     record.measuredAt
@@ -2288,21 +2344,20 @@
         async function downloadManufacturerLatencyCsv() {
             const csv = buildManufacturerLatencyCsv();
             if (!csv) {
-                alert('No manufacturer latency results to download yet.');
+                alert('No manufacturer submission latency results to download yet.');
                 return;
             }
-            await downloadCsvFile(csv, 'manufacturer-latency.csv', 'Manufacturer latency', 'TraceChain manufacturer latency CSV');
+            await downloadCsvFile(csv, 'manufacturer-transaction-submission-latency.csv', 'Manufacturer transaction submission latency', 'TraceChain manufacturer transaction submission latency CSV');
         }
 
         async function copyManufacturerLatencyCsv() {
             const csv = buildManufacturerLatencyCsv();
             if (!csv) {
-                alert('No manufacturer latency results to copy yet.');
+                alert('No manufacturer submission latency results to copy yet.');
                 return;
             }
-            await copyCsvToClipboard(csv, 'Manufacturer latency CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+            await copyCsvToClipboard(csv, 'Manufacturer transaction submission latency CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
         }
-
         function renderManufacturerThroughputLog() {
             const latestEl = document.getElementById('manufacturer-throughput-latest');
             const averageEl = document.getElementById('manufacturer-throughput-average');

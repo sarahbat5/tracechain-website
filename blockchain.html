@@ -1366,12 +1366,12 @@
         </div>
 
         <div class="card testing-manufacturer">
-            <div class="card-title">Manufacturer throughput testing</div>
+            <div class="card-title">Manufacturer registration throughput testing</div>
             <div class="response-time-panel">
                 <div class="throughput-controls">
                     <div class="form-group">
-                        <label>Product ID to test</label>
-                        <input type="text" id="manufacturer-throughput-pid" placeholder="PRD-2024-001"
+                        <label>Base Product ID</label>
+                        <input type="text" id="manufacturer-throughput-pid" placeholder="PRD-TEST"
                             style="font-family:var(--font-mono); font-size:15px;" />
                     </div>
                     <div class="form-group">
@@ -1383,7 +1383,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Requests</label>
+                        <label>Registrations</label>
                         <input type="number" id="manufacturer-throughput-count" min="1" max="100" value="10" />
                     </div>
                     <button class="btn btn-primary" id="manufacturer-throughput-run-btn"
@@ -1400,8 +1400,8 @@
                     </div>
                 </div>
                 <p class="response-time-note">
-                    Throughput is calculated as successful manufacturer Product ID lookup requests divided by the total
-                    time taken.
+                    Throughput is calculated as successful product registration transactions divided by the total
+                    blockchain confirmation time. Each test creates unique Product IDs and Auth Codes.
                 </p>
                 <div id="manufacturer-throughput-status"></div>
                 <div class="throughput-actions">
@@ -1415,8 +1415,8 @@
                             <tr>
                                 <th>No.</th>
                                 <th>Network</th>
-                                <th>Product ID</th>
-                                <th>Requests</th>
+                                <th>Product prefix</th>
+                                <th>Registrations</th>
                                 <th>Total time</th>
                                 <th>Throughput</th>
                             </tr>
@@ -1703,7 +1703,7 @@
         let confirmationTimeLog = loadConfirmationTimeLog();
         const MANUFACTURER_LATENCY_LOG_KEY = 'tracechainManufacturerLatencyLog';
         let manufacturerLatencyLog = loadStoredLog(MANUFACTURER_LATENCY_LOG_KEY);
-        const MANUFACTURER_THROUGHPUT_LOG_KEY = 'tracechainManufacturerThroughputLog';
+        const MANUFACTURER_THROUGHPUT_LOG_KEY = 'tracechainManufacturerRegistrationThroughputLog';
         let manufacturerThroughputLog = loadStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY);
         const CUSTOMER_LATENCY_LOG_KEY = 'tracechainCustomerLatencyLog';
         let customerLatencyLog = loadStoredLog(CUSTOMER_LATENCY_LOG_KEY);
@@ -2314,11 +2314,11 @@
                 ? manufacturerThroughputLog.reduce((sum, item) => sum + Number(item.throughput || 0), 0) / manufacturerThroughputLog.length
                 : NaN;
 
-            latestEl.textContent = latest ? formatThroughput(Number(latest.throughput)) : '-';
-            averageEl.textContent = Number.isFinite(average) ? formatThroughput(average) : '-';
+            latestEl.textContent = latest ? formatRegistrationThroughput(Number(latest.throughput)) : '-';
+            averageEl.textContent = Number.isFinite(average) ? formatRegistrationThroughput(average) : '-';
 
             if (!manufacturerThroughputLog.length) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No manufacturer throughput tests recorded yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);">No manufacturer registration throughput tests recorded yet.</td></tr>';
                 return;
             }
 
@@ -2329,18 +2329,25 @@
             <td><span style="font-family:monospace;font-size:12px;">${escapeHtml(record.pid)}</span></td>
             <td>${record.successfulRequests}/${record.totalRequests}</td>
             <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.totalMs))}</span></td>
-            <td><span style="font-family:monospace;font-size:12px;">${formatThroughput(Number(record.throughput))}</span></td>
+            <td><span style="font-family:monospace;font-size:12px;">${formatRegistrationThroughput(Number(record.throughput))}</span></td>
         </tr>`).join('');
+        }
+
+        function formatRegistrationThroughput(value) {
+            if (!Number.isFinite(value)) return '-';
+            return `${value.toFixed(3)} registrations/s`;
         }
 
         async function runManufacturerThroughputTest() {
             const btn = document.getElementById('manufacturer-throughput-run-btn');
             const statusEl = document.getElementById('manufacturer-throughput-status');
-            let pid;
+            let basePid;
             let totalRequests;
 
             try {
-                pid = getManufacturerProductId('manufacturer-throughput-pid');
+                const input = document.getElementById('manufacturer-throughput-pid');
+                basePid = ((input && input.value.trim()) || 'PRD-TEST').replace(/\s+/g, '-').toUpperCase();
+                if (input) input.value = basePid;
                 totalRequests = getBoundedInteger('manufacturer-throughput-count', 10, 1, 100);
             } catch (err) {
                 if (statusEl) statusEl.innerHTML = `<div class="status-box error">${escapeHtml(err.message || err)}</div>`;
@@ -2352,34 +2359,73 @@
                 btn.textContent = 'Running...';
             }
             if (statusEl) {
-                statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Running ${totalRequests} manufacturer Product ID lookup requests...</div>`;
+                statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Preparing ${totalRequests} product registration transactions. MetaMask approval is required for each transaction.</div>`;
             }
 
             try {
-                await initBlockchain({ requireAccount: false });
+                await initBlockchain({ requireAccount: true });
+
+                const runId = Date.now().toString(36).toUpperCase();
                 const startedAt = performance.now();
-                const results = await Promise.all(
-                    Array.from({ length: totalRequests }, () =>
-                        performManufacturerProductRead(pid).catch(() => false)
-                    )
-                );
+                const results = [];
+
+                for (let index = 0; index < totalRequests; index++) {
+                    const sequence = String(index + 1).padStart(3, '0');
+                    const pid = `${basePid}-${runId}-${sequence}`;
+                    const authCode = `TC-${runId}${sequence}`;
+                    const batchId = `BATCH-${runId}-${sequence}`;
+                    const today = new Date().toISOString().slice(0, 10);
+
+                    if (statusEl) {
+                        statusEl.innerHTML = `<div class="status-box info">&#8987;&nbsp;Registering product ${index + 1} of ${totalRequests}: <span style="font-family:monospace;">${escapeHtml(pid)}</span>. Confirm the transaction in MetaMask.</div>`;
+                    }
+
+                    try {
+                        const receipt = await contract.methods.registerProduct(
+                            pid,
+                            `Throughput Test Product ${index + 1}`,
+                            'Testing',
+                            batchId,
+                            authCode,
+                            'Throughput Test Manufacturer',
+                            'Sepolia Test',
+                            today,
+                            ''
+                        ).send({ from: account, gas: 500000 });
+
+                        results.push({
+                            ok: true,
+                            pid,
+                            authCode,
+                            blockNumber: receipt && receipt.blockNumber != null ? Number(receipt.blockNumber) : null
+                        });
+                    } catch (err) {
+                        results.push({
+                            ok: false,
+                            pid,
+                            authCode,
+                            error: err.message || String(err)
+                        });
+                    }
+                }
 
                 const totalMs = performance.now() - startedAt;
                 const totalSeconds = totalMs / 1000;
-                const successfulRequests = results.filter(Boolean).length;
+                const successfulRequests = results.filter(result => result.ok).length;
                 const failedRequests = totalRequests - successfulRequests;
                 const throughput = totalSeconds > 0 ? successfulRequests / totalSeconds : 0;
 
                 const record = {
                     number: manufacturerThroughputLog.length + 1,
                     network: getSelectedLabel('manufacturer-throughput-network'),
-                    pid,
+                    pid: basePid,
                     totalRequests,
                     successfulRequests,
                     failedRequests,
                     totalMs,
                     totalSeconds,
                     throughput,
+                    registeredProductIds: results.filter(result => result.ok).map(result => result.pid).join(' | '),
                     measuredAt: new Date().toLocaleString()
                 };
 
@@ -2391,16 +2437,16 @@
                     statusEl.innerHTML = `
             <div class="status-box success">
                 <div>
-                    <strong>Manufacturer throughput test complete.</strong><br>
-                    Formula: ${successfulRequests} successful product lookup requests / ${totalSeconds.toFixed(3)} seconds =
-                    <strong style="font-family:monospace;">${formatThroughput(throughput)}</strong><br>
-                    Failed or not-found requests: ${failedRequests}
+                    <strong>Manufacturer registration throughput test complete.</strong><br>
+                    Formula: ${successfulRequests} successful registration transactions / ${totalSeconds.toFixed(3)} seconds =
+                    <strong style="font-family:monospace;">${formatRegistrationThroughput(throughput)}</strong><br>
+                    Failed registrations: ${failedRequests}
                 </div>
             </div>`;
                 }
             } catch (err) {
                 if (statusEl) {
-                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer throughput test failed: ${escapeHtml(err.message || err)}</div>`;
+                    statusEl.innerHTML = `<div class="status-box error">&#10005;&nbsp;Manufacturer registration throughput test failed: ${escapeHtml(err.message || err)}</div>`;
                 }
             } finally {
                 if (btn) {
@@ -2412,7 +2458,7 @@
 
         function clearManufacturerThroughputLog() {
             if (!manufacturerThroughputLog.length) return;
-            if (!confirm('Clear all recorded manufacturer throughput results?')) return;
+            if (!confirm('Clear all recorded manufacturer registration throughput results?')) return;
             manufacturerThroughputLog = [];
             saveStoredLog(MANUFACTURER_THROUGHPUT_LOG_KEY, manufacturerThroughputLog);
             renderManufacturerThroughputLog();
@@ -2425,13 +2471,14 @@
                 [
                     'No',
                     'Network',
-                    'Product ID',
-                    'Total Requests',
-                    'Successful Requests',
-                    'Failed Requests',
+                    'Product Prefix',
+                    'Total Registrations',
+                    'Successful Registrations',
+                    'Failed Registrations',
                     'Total Time (ms)',
                     'Total Time (s)',
-                    'Throughput (requests/second)',
+                    'Throughput (registrations/second)',
+                    'Registered Product IDs',
                     'Measured At'
                 ],
                 manufacturerThroughputLog.map(record => [
@@ -2444,6 +2491,7 @@
                     Math.round(Number(record.totalMs || 0)),
                     Number(record.totalSeconds || 0).toFixed(3),
                     Number(record.throughput || 0).toFixed(3),
+                    record.registeredProductIds || '',
                     record.measuredAt
                 ])
             );
@@ -2452,19 +2500,19 @@
         async function downloadManufacturerThroughputCsv() {
             const csv = buildManufacturerThroughputCsv();
             if (!csv) {
-                alert('No manufacturer throughput results to download yet.');
+                alert('No manufacturer registration throughput results to download yet.');
                 return;
             }
-            await downloadCsvFile(csv, 'manufacturer-throughput.csv', 'Manufacturer throughput', 'TraceChain manufacturer throughput CSV');
+            await downloadCsvFile(csv, 'manufacturer-registration-throughput.csv', 'Manufacturer registration throughput', 'TraceChain manufacturer registration throughput CSV');
         }
 
         async function copyManufacturerThroughputCsv() {
             const csv = buildManufacturerThroughputCsv();
             if (!csv) {
-                alert('No manufacturer throughput results to copy yet.');
+                alert('No manufacturer registration throughput results to copy yet.');
                 return;
             }
-            await copyCsvToClipboard(csv, 'Manufacturer throughput CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
+            await copyCsvToClipboard(csv, 'Manufacturer registration throughput CSV copied. You can paste it into Notes, Excel, Google Sheets, or WhatsApp.');
         }
 
         function getCustomerLatencyPayload() {

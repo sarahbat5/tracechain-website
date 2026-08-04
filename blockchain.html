@@ -1773,37 +1773,32 @@
         const PAGES = ['manufacturer', 'customer', 'testing'];
         const urlParams = new URLSearchParams(location.search);
         const requestedPortal = PAGES.includes(urlParams.get('portal')) ? urlParams.get('portal') : null;
-        let testingContext = requestedPortal === 'customer' ? 'customer' : 'manufacturer';
-
         function getActivePageName() {
             const activePage = document.querySelector('.page.active');
             return activePage ? activePage.id.replace('page-', '') : '';
         }
 
         function updateTestingPortal() {
-            const isManufacturerTesting = testingContext === 'manufacturer';
             document.querySelectorAll('.testing-manufacturer').forEach(section => {
-                section.style.display = isManufacturerTesting ? '' : 'none';
+                section.style.display = '';
             });
             document.querySelectorAll('.testing-customer').forEach(section => {
-                section.style.display = isManufacturerTesting ? 'none' : '';
+                section.style.display = '';
             });
 
             const title = document.getElementById('testing-title');
             const description = document.getElementById('testing-description');
-            if (title) title.textContent = isManufacturerTesting ? 'Manufacturer network testing' : 'Customer network testing';
+            if (title) title.textContent = 'Manufacturer network testing';
             if (description) {
-                description.textContent = isManufacturerTesting
-                    ? 'Measure manufacturer storage confirmation time, transaction submission latency, and registration throughput on Sepolia.'
-                    : 'Measure customer verification response time, latency, and throughput on Sepolia.';
+                description.textContent = 'Monitor manufacturer storage confirmation time, transaction submission latency, registration throughput, and customer verification performance on Sepolia.';
             }
         }
 
         function updatePortalNav(activePage) {
             const visiblePages = {
                 manufacturer: ['manufacturer', 'testing'],
-                customer: ['customer', 'testing'],
-                testing: [testingContext, 'testing']
+                customer: ['customer'],
+                testing: ['manufacturer', 'testing']
             }[activePage] || PAGES;
 
             document.querySelectorAll('.nav-tab').forEach((tab, index) => {
@@ -1820,12 +1815,8 @@
 
         function showPage(name) {
             if (!PAGES.includes(name)) name = 'manufacturer';
-            const previousPage = getActivePageName();
-            if (name === 'testing' && ['manufacturer', 'customer'].includes(previousPage)) {
-                testingContext = previousPage;
-            }
-            if (['manufacturer', 'customer'].includes(name)) {
-                testingContext = name;
+            if (requestedPortal === 'customer' && name === 'testing') {
+                name = 'customer';
             }
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('page-' + name).classList.add('active');

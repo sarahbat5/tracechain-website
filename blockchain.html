@@ -1815,7 +1815,8 @@
 
         function showPage(name) {
             if (!PAGES.includes(name)) name = 'manufacturer';
-            if (requestedPortal === 'customer' && name === 'testing') {
+            const previousPage = getActivePageName();
+            if (name === 'testing' && (requestedPortal === 'customer' || previousPage === 'customer')) {
                 name = 'customer';
             }
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1978,6 +1979,38 @@
             };
         }
 
+        function renderCustomerResponseSummary(record) {
+            return `
+            <div class="card response-time-summary">
+                <div class="card-title">Customer verification response time</div>
+                <div class="info-grid">
+                    <div class="info-cell">
+                        <div class="lbl">Network</div>
+                        <div class="val">${escapeHtml(record.network)}</div>
+                    </div>
+                    <div class="info-cell">
+                        <div class="lbl">Result</div>
+                        <div class="val">${escapeHtml(record.outcome)}</div>
+                    </div>
+                    <div class="info-cell full-width">
+                        <div class="lbl">Measured response time</div>
+                        <div class="val" style="font-family:monospace;">${formatResponseTimeWithSeconds(record.elapsedMs)}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function showCustomerResponseSummary(resultEl, record) {
+            if (!resultEl) return;
+            const summaryHtml = renderCustomerResponseSummary(record);
+            const banner = resultEl.querySelector('.verify-banner');
+            if (banner) {
+                banner.insertAdjacentHTML('afterend', summaryHtml);
+                return;
+            }
+            resultEl.insertAdjacentHTML('beforeend', summaryHtml);
+        }
+
         function completeCustomerResponseTimer(timer, resultEl, outcome, authCode) {
             if (!timer || timer.completed) return;
 
@@ -1998,27 +2031,7 @@
                 responseTimeLog.push(record);
                 saveResponseTimeLog();
                 renderResponseTimeLog();
-
-                if (resultEl) {
-                    resultEl.insertAdjacentHTML('beforeend', `
-            <div class="card response-time-summary">
-                <div class="card-title">Customer verification response time</div>
-                <div class="info-grid">
-                    <div class="info-cell">
-                        <div class="lbl">Network</div>
-                        <div class="val">${escapeHtml(record.network)}</div>
-                    </div>
-                    <div class="info-cell">
-                        <div class="lbl">Result</div>
-                        <div class="val">${escapeHtml(record.outcome)}</div>
-                    </div>
-                    <div class="info-cell full-width">
-                        <div class="lbl">Measured response time</div>
-                        <div class="val" style="font-family:monospace;">${formatResponseTimeWithSeconds(record.elapsedMs)}</div>
-                    </div>
-                </div>
-            </div>`);
-                }
+                showCustomerResponseSummary(resultEl, record);
             });
         }
 
@@ -2049,6 +2062,12 @@
             <td>${escapeHtml(record.outcome)}</td>
             <td><span style="font-family:monospace;font-size:12px;">${formatResponseTimeWithSeconds(Number(record.elapsedMs))}</span></td>
         </tr>`).join('');
+        }
+
+        function syncResponseTimeLogFromStorage(event) {
+            if (event && event.key !== RESPONSE_TIME_LOG_KEY) return;
+            responseTimeLog = loadResponseTimeLog();
+            renderResponseTimeLog();
         }
 
         function clearResponseTimeLog() {
@@ -4034,6 +4053,7 @@
         }
 
         window.addEventListener('hashchange', showPageFromHash);
+        window.addEventListener('storage', syncResponseTimeLogFromStorage);
         if (window.ethereum && window.ethereum.on) {
             window.ethereum.on('accountsChanged', (accounts) => {
                 account = accounts && accounts.length ? accounts[0] : null;
